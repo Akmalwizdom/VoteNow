@@ -61,6 +61,14 @@ export function CreatePoll() {
     try {
       const token = await auth.currentUser?.getIdToken();
       
+      if (!token) {
+        toast.error('You must be logged in to create a poll');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Creating poll with token:', token.substring(0, 20) + '...');
+      
       const response = await fetch('http://localhost:5000/api/polls', {
         method: 'POST',
         headers: {
@@ -74,8 +82,12 @@ export function CreatePoll() {
         }),
       });
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to create poll');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Server error:', errorData);
+        throw new Error(errorData.error || 'Failed to create poll');
       }
 
       const data = await response.json();
@@ -83,7 +95,7 @@ export function CreatePoll() {
       navigate(`/poll/${data._id}`);
     } catch (error) {
       console.error('Error creating poll:', error);
-      toast.error('Failed to create poll. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to create poll. Please try again.');
     } finally {
       setLoading(false);
     }
