@@ -3,7 +3,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { verifyToken } from './middleware/verifyToken.js';
+import mongoose from 'mongoose';
+import { verifyToken } from './middleware/auth.js';
 import {
   createPoll,
   getPolls,
@@ -17,9 +18,14 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
+// MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/votenow')
+  .then(() => console.log('✅ MongoDB connected successfully'))
+  .catch((err) => console.error('❌ MongoDB connection error:', err));
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -28,7 +34,7 @@ const io = new Server(httpServer, {
 setSocketIO(io);
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true,
 }));
 
@@ -41,7 +47,7 @@ app.get('/health', (req, res) => {
 app.post('/api/polls', verifyToken, createPoll);
 app.get('/api/polls', getPolls);
 app.get('/api/polls/:id', getPollById);
-app.post('/api/polls/:id/vote', verifyToken, voteOnPoll);
+app.post('/api/polls/:id/vote', voteOnPoll);
 
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);

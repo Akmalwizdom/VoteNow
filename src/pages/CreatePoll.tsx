@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { X, Plus, Loader2 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useAuth } from '../contexts/AuthContext';
+import { auth } from '../firebase';
 
 export function CreatePoll() {
   const { user } = useAuth();
@@ -58,16 +59,18 @@ export function CreatePoll() {
     setLoading(true);
 
     try {
+      const token = await auth.currentUser?.getIdToken();
+      
       const response = await fetch('http://localhost:5000/api/polls', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
           options: validOptions.map(text => ({ text })),
-          createdBy: user?.uid,
         }),
       });
 

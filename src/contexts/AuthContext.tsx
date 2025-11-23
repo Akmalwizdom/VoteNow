@@ -1,4 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { auth } from '../firebase';
 
 interface User {
   uid: string;
@@ -21,39 +29,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in (from localStorage)
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0],
+        });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return unsubscribe;
   }, []);
 
   const login = async (email: string, password: string) => {
-    // Mock Firebase login - replace with actual Firebase auth
-    const mockUser = {
-      uid: Math.random().toString(36).substring(7),
-      email,
-      displayName: email.split('@')[0],
-    };
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const signup = async (email: string, password: string) => {
-    // Mock Firebase signup - replace with actual Firebase auth
-    const mockUser = {
-      uid: Math.random().toString(36).substring(7),
-      email,
-      displayName: email.split('@')[0],
-    };
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+    await createUserWithEmailAndPassword(auth, email, password);
   };
 
   const logout = async () => {
-    setUser(null);
-    localStorage.removeItem('user');
+    await signOut(auth);
   };
 
   return (

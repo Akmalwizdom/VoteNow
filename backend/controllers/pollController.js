@@ -1,5 +1,4 @@
-import { db } from '../firebase.js';
-import { FieldValue } from 'firebase-admin/firestore';
+import Poll from '../models/Poll.js';
 
 let io;
 
@@ -9,7 +8,7 @@ export const setSocketIO = (socketIO) => {
 
 export const createPoll = async (req, res) => {
   try {
-    const { title, description, options, expiresAt, settings } = req.body;
+    const { title, description, options } = req.body;
     const user = req.user;
 
     if (!title || !options || options.length < 2) {
@@ -19,24 +18,17 @@ export const createPoll = async (req, res) => {
     const pollData = {
       title,
       description: description || '',
-      options: options.map((opt, index) => ({
-        id: `opt_${index}_${Date.now()}`,
+      options: options.map(opt => ({
         text: opt.text || opt,
-        voteCount: 0,
+        votes: 0,
       })),
       createdBy: user.uid,
-      createdAt: FieldValue.serverTimestamp(),
-      expiresAt: expiresAt || null,
-      settings: {
-        isAnonymous: settings?.isAnonymous || false,
-        allowMultiple: settings?.allowMultiple || false,
-      },
+      createdAt: new Date(),
     };
 
-    const pollRef = await db.collection('polls').add(pollData);
-    const poll = await pollRef.get();
+    const poll = await Poll.create(pollData);
 
-    res.status(201).json({ id: pollRef.id, ...poll.data() });
+    res.status(201).json(poll);
   } catch (error) {
     console.error('Error creating poll:', error);
     res.status(500).json({ error: 'Failed to create poll' });
@@ -45,15 +37,7 @@ export const createPoll = async (req, res) => {
 
 export const getPolls = async (req, res) => {
   try {
-    const pollsSnapshot = await db.collection('polls')
-      .orderBy('createdAt', 'desc')
-      .get();
-
-    const polls = pollsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
+    const polls = await Poll.find().sort({ createdAt: -1 });
     res.status(200).json(polls);
   } catch (error) {
     console.error('Error fetching polls:', error);
@@ -64,13 +48,13 @@ export const getPolls = async (req, res) => {
 export const getPollById = async (req, res) => {
   try {
     const { id } = req.params;
-    const pollDoc = await db.collection('polls').doc(id).get();
+    const poll = await Poll.findById(id);
 
-    if (!pollDoc.exists) {
+    if (!poll) {
       return res.status(404).json({ error: 'Poll not found' });
     }
 
-    res.status(200).json({ id: pollDoc.id, ...pollDoc.data() });
+    res.status(200).json(poll);
   } catch (error) {
     console.error('Error fetching poll:', error);
     res.status(500).json({ error: 'Failed to fetch poll' });
@@ -80,86 +64,32 @@ export const getPollById = async (req, res) => {
 export const voteOnPoll = async (req, res) => {
   try {
     const { id } = req.params;
-    const { optionIds } = req.body;
-    const user = req.user;
+    const { optionIndex } = req.body;
 
-    if (!optionIds || !Array.isArray(optionIds) || optionIds.length === 0) {
-      return res.status(400).json({ error: 'At least one option must be selected' });
+    if (optionIndex === undefined || optionIndex < 0) {
+      return res.status(400).json({ error: 'Valid optionIndex is required' });
     }
 
-    const pollRef = db.collection('polls').doc(id);
-    const votesRef = db.collection('votes');
+    const poll = await Poll.findById(id);
 
-    await db.runTransaction(async (transaction) => {
-      const pollDoc = await transaction.get(pollRef);
+    if (!poll) {
+      return res.status(404).json({ error: 'Poll not found' });
+    }
 
-      if (!pollDoc.exists) {
-        throw new Error('Poll not found');
-      }
+    if (optionIndex >= poll.options.length) {
+      return res.status(400).json({ error: 'Invalid option index' });
+    }
 
-      const pollData = pollDoc.data();
-
-      const existingVoteQuery = await votesRef
-        .where('pollId', '==', id)
-        .where('userId', '==', user.uid)
-        .get();
-
-      if (!existingVoteQuery.empty) {
-        throw new Error('User has already voted on this poll');
-      }
-
-      const allowMultiple = pollData.settings?.allowMultiple || false;
-      if (!allowMultiple && optionIds.length > 1) {
-        throw new Error('Multiple votes not allowed for this poll');
-      }
-
-      const validOptionIds = pollData.options.map(opt => opt.id);
-      const invalidOptions = optionIds.filter(id => !validOptionIds.includes(id));
-      if (invalidOptions.length > 0) {
-        throw new Error(`Invalid option IDs: ${invalidOptions.join(', ')}`);
-      }
-
-      const updatedOptions = pollData.options.map(option => {
-        if (optionIds.includes(option.id)) {
-          return { ...option, voteCount: option.voteCount + 1 };
-        }
-        return option;
-      });
-
-      transaction.update(pollRef, { options: updatedOptions });
-
-      const voteData = {
-        pollId: id,
-        userId: user.uid,
-        optionIds,
-        timestamp: FieldValue.serverTimestamp(),
-      };
-
-      const newVoteRef = votesRef.doc();
-      transaction.set(newVoteRef, voteData);
-    });
-
-    const updatedPollDoc = await pollRef.get();
-    const updatedPollData = { id: updatedPollDoc.id, ...updatedPollDoc.data() };
+    poll.options[optionIndex].votes += 1;
+    await poll.save();
 
     if (io) {
-      io.to(`poll_${id}`).emit('update_poll', updatedPollData);
+      io.to(`poll_${id}`).emit('update_poll', poll);
     }
 
-    res.status(200).json({ message: 'Vote recorded successfully', poll: updatedPollData });
+    res.status(200).json({ message: 'Vote recorded successfully', poll });
   } catch (error) {
     console.error('Error voting on poll:', error);
-    
-    if (error.message === 'Poll not found') {
-      return res.status(404).json({ error: error.message });
-    }
-    if (error.message === 'User has already voted on this poll') {
-      return res.status(400).json({ error: error.message });
-    }
-    if (error.message.includes('Invalid option IDs') || error.message === 'Multiple votes not allowed for this poll') {
-      return res.status(400).json({ error: error.message });
-    }
-
     res.status(500).json({ error: 'Failed to record vote' });
   }
 };

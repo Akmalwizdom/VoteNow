@@ -1,44 +1,94 @@
 # Role
-Act as a Senior Backend Engineer specialized in Node.js, Express, and Firebase. Your goal is to build the robust API server for a Real-time Voting System.
+Act as a Senior Full Stack Developer. We have an existing React Frontend (Vite + Tailwind) for a Voting App, but the Backend is missing, and Authentication is currently mocked.
 
-# Project Context
-We are building a voting app where users create polls and vote in real-time. We need a REST API handling logic and a Socket.IO server for live updates.
+# Task
+Your task is to build the complete **Node.js/Express Backend** and upgrade the **Frontend Authentication** to use real Firebase Auth.
 
-# Tech Stack
-- Runtime: Node.js
-- Framework: Express.js
-- Database: Firebase Firestore (NoSQL)
-- Auth: Firebase Admin SDK (Verify ID Tokens from frontend)
-- Real-time: Socket.IO
+# Current Frontend Context
+- **Frontend Port:** Running on `http://localhost:3000`
+- **Backend Expected URL:** `http://localhost:5000`
+- **Data Structure (Poll):**
+  ```json
+  {
+    "_id": "mongo_object_id",
+    "title": "String",
+    "description": "String",
+    "options": [{ "text": "String", "votes": Number }],
+    "createdBy": "user_uid",
+    "createdAt": "Date"
+  }
 
-# Requirements
+Requirements
+Part 1: Backend Setup (Node.js + Express + MongoDB)
+Create a backend folder with a robust structure.
 
-## 1. Database Schema (Firestore)
-Define the data models for these collections:
-- `users`: uid, email, displayName, role (admin/user).
-- `polls`: title, description, options [{id, text, voteCount}], createdBy, createdAt, expiresAt, settings {isAnonymous, allowMultiple}.
-- `votes`: pollId, userId, optionIds[], timestamp. (Separate collection to prevent double-voting).
+Dependencies: Use express, mongoose (for MongoDB), socket.io (for real-time), cors, dotenv, and firebase-admin (for verifying tokens).
 
-## 2. API Endpoints & Logic
-Implement the following routes in `server.js` or separate route files:
-- `POST /api/polls`: Create a new poll. Verify user token.
-- `GET /api/polls`: Get list of polls.
-- `GET /api/polls/:id`: Get poll details.
-- `POST /api/polls/:id/vote`:
-    - logic: Check if user already voted.
-    - logic: Validate options exist.
-    - logic: Use **Firestore Transactions** to increment counters atomically (prevent race conditions).
-    - **IMPORTANT**: After a successful vote, emit a Socket.IO event `update_poll` to room `poll_:id` with the new data.
+Server Setup (server.js):
 
-## 3. Real-time Server
-- Setup Socket.IO with CORS enabled.
-- Implement rooms: Users should join a room based on poll ID (e.g., `socket.join('poll_123')`) to receive updates only for that poll.
+Run on port 5000.
 
-## 4. Security
-- Create a middleware `verifyToken` that uses Firebase Admin to check the Authorization header (Bearer token).
+CORS Configuration: Strictly allow origin http://localhost:3000 to prevent connection errors.
 
-# Output
-Please provide:
-1. The comprehensive `server.js` file.
-2. The Firestore service configuration file (`firebase.js`).
-3. The Controller logic for Voting (handling the transaction and socket emission).
+Initialize MongoDB connection.
+
+Initialize Socket.IO with CORS allowed for the frontend.
+
+Database Schema: Create a Mongoose schema for Poll matching the data structure above.
+
+API Endpoints: Implement these exact routes used by the frontend:
+
+GET /api/polls: Return all polls (sorted by newest).
+
+GET /api/polls/:id: Return specific poll details.
+
+POST /api/polls: Create a new poll. Secure this route (require Auth).
+
+POST /api/polls/:id/vote:
+
+Body: { optionIndex: number }
+
+Logic: Increment the vote count for the specific option.
+
+IMPORTANT: After saving, emit a global Socket.IO event 'update_poll' with the updated poll data to the room 'poll_:id'.
+
+Socket.IO Logic:
+
+Listen for 'join_poll' (payload: pollId) -> Join room.
+
+Listen for 'leave_poll' (payload: pollId) -> Leave room.
+
+Part 2: Frontend Authentication (Firebase)
+Refactor the file src/contexts/AuthContext.tsx to replace the mock logic with real Firebase Authentication.
+
+Setup: Provide the code to initialize Firebase (src/firebase.ts) using firebase/app and firebase/auth.
+
+Context Logic:
+
+Replace the dummy login, signup, and logout functions with signInWithEmailAndPassword, createUserWithEmailAndPassword, and signOut from Firebase.
+
+Track the currentUser state using onAuthStateChanged.
+
+Expose the user object and auth functions to the app.
+
+Part 3: Security Integration
+Backend Middleware: Create a middleware function verifyToken using firebase-admin. Use this middleware to protect the POST /api/polls route so only logged-in users can create polls.
+
+Frontend Token: In the CreatePoll.tsx logic (I will update this manually, just explain how), ensure the API call includes the Authorization: Bearer <token> header.
+
+Output Deliverables
+Please provide the code in this order:
+
+backend/package.json (dependencies list).
+
+backend/server.js (Main server code with Socket.io & Routes).
+
+backend/models/Poll.js (Mongoose Schema).
+
+backend/middleware/auth.js (Firebase Admin verification).
+
+src/firebase.ts (Frontend Firebase config).
+
+src/contexts/AuthContext.tsx (Refactored with real Auth).
+
+Let's start coding.
