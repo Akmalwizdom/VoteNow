@@ -63,13 +63,16 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Server is running' });
 });
 
+// Protected routes - require authentication
 app.post('/api/polls', verifyToken, createPoll);
-app.get('/api/polls', getPolls);
-app.get('/api/polls/:id', getPollById);
+app.get('/api/polls', verifyToken, getPolls); // Now requires authentication
 app.get('/api/polls/:id/share', verifyToken, getShareLink);
 app.put('/api/polls/:id', verifyToken, updatePoll);
 app.delete('/api/polls/:id', verifyToken, deletePoll);
-app.post('/api/polls/:id/vote', optionalAuth, voteOnPoll);
+
+// Public routes - allow anonymous access (for shared links)
+app.get('/api/polls/:id', getPollById); // Public for shared links
+app.post('/api/polls/:id/vote', optionalAuth, voteOnPoll); // Public voting
 
 // Serve static files from the React app (production only)
 const buildPath = path.join(__dirname, '..', 'build');

@@ -17,10 +17,17 @@ export default function App() {
         <div className="min-h-screen bg-background">
           <Navbar />
           <Routes>
-            <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/poll/:id" element={<PollDetail />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Home />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/create"
               element={

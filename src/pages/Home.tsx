@@ -6,6 +6,8 @@ import { Skeleton } from '../components/ui/skeleton';
 import { PlusCircle, Vote, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getApiUrl } from '../config/api';
+import { auth } from '../firebase';
+import { toast } from 'sonner@2.0.3';
 
 interface Poll {
   _id: string;
@@ -30,15 +32,39 @@ export function Home() {
 
   const fetchPolls = async () => {
     try {
-      const response = await fetch(getApiUrl('api/polls'));
-      if (response.ok) {
-        const result = await response.json();
-        // Backend returns paginated data: { page, limit, total, data }
-        // We need to extract the 'data' array which contains the actual polls
-        setPolls(result.data || []);
+      // Get authentication token
+      const token = await auth.currentUser?.getIdToken();
+      
+      if (!token) {
+        console.error('No authentication token available');
+        toast.error('Authentication required to view polls');
+        setLoading(false);
+        return;
       }
+
+      const response = await fetch(getApiUrl('api/polls'), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          toast.error('Please log in to view polls');
+        } else {
+          throw new Error('Failed to fetch polls');
+        }
+        setLoading(false);
+        return;
+      }
+
+      const result = await response.json();
+      // Backend returns paginated data: { page, limit, total, data }
+      // We need to extract the 'data' array which contains the actual polls
+      setPolls(result.data || []);
     } catch (error) {
       console.error('Error fetching polls:', error);
+      toast.error('Failed to load polls');
     } finally {
       setLoading(false);
     }
