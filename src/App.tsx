@@ -5,6 +5,7 @@ import { Navbar } from './components/Navbar';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Home } from './pages/Home';
 import { CreatePoll } from './pages/CreatePoll';
+import { EditPoll } from './pages/EditPoll';
 import { PollDetail } from './pages/PollDetail';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
@@ -25,6 +26,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <CreatePoll />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/poll/:id/edit"
+              element={
+                <ProtectedRoute>
+                  <EditPoll />
                 </ProtectedRoute>
               }
             />

@@ -5,6 +5,7 @@ import { PollCard } from '../components/PollCard';
 import { Skeleton } from '../components/ui/skeleton';
 import { PlusCircle, Vote, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../config/api';
 
 interface Poll {
   _id: string;
@@ -12,6 +13,9 @@ interface Poll {
   description?: string;
   options: Array<{ text: string; votes: number }>;
   createdAt: string;
+  createdBy?: string;
+  createdByEmail?: string;
+  createdByName?: string;
 }
 
 export function Home() {
@@ -26,10 +30,12 @@ export function Home() {
 
   const fetchPolls = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/polls');
+      const response = await fetch(getApiUrl('api/polls'));
       if (response.ok) {
-        const data = await response.json();
-        setPolls(data);
+        const result = await response.json();
+        // Backend returns paginated data: { page, limit, total, data }
+        // We need to extract the 'data' array which contains the actual polls
+        setPolls(result.data || []);
       }
     } catch (error) {
       console.error('Error fetching polls:', error);
@@ -137,7 +143,7 @@ export function Home() {
           ) : polls.length > 0 ? (
             <div className="grid md:grid-cols-2 gap-6">
               {polls.map((poll) => (
-                <PollCard key={poll._id} poll={poll} />
+                <PollCard key={poll._id} poll={poll} onDelete={fetchPolls} />
               ))}
             </div>
           ) : (

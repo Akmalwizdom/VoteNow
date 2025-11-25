@@ -6,10 +6,24 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Label } from '../components/ui/label';
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
-import { ArrowLeft, Users, CheckCircle2, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
+import { ArrowLeft, Users, CheckCircle2, Loader2, Edit2, Trash2, Share2 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useSocket } from '../hooks/useSocket';
+import { useAuth } from '../contexts/AuthContext';
+import { auth } from '../firebase';
+import { ShareDialog } from '../components/ShareDialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { getApiUrl } from '../config/api';
 
 interface PollOption {
   text: string;
@@ -22,11 +36,15 @@ interface Poll {
   description?: string;
   options: PollOption[];
   createdAt: string;
+  createdBy?: string;
+  createdByEmail?: string;
+  createdByName?: string;
 }
 
 export function PollDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { joinPollRoom, leavePollRoom, onPollUpdate, offPollUpdate, isConnected } = useSocket();
 
   const [poll, setPoll] = useState<Poll | null>(null);
@@ -34,11 +52,26 @@ export function PollDetail() {
   const [voting, setVoting] = useState(false);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+
+  // Test function to verify state management
+  const testShareDialog = () => {
+    console.log('=== TEST SHARE DIALOG ===');
+    console.log('Current state:', showShareDialog);
+    console.log('Setting to true...');
+    setShowShareDialog(true);
+    // Use setTimeout to check after React has updated
+    setTimeout(() => {
+      console.log('State after update should be true');
+    }, 100);
+  };
 
   // Fetch poll data
   const fetchPoll = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/polls/${id}`);
+      const response = await fetch(getApiUrl(`api/polls/${id}`));
       if (!response.ok) {
         throw new Error('Poll not found');
       }
@@ -60,27 +93,32 @@ export function PollDetail() {
   }, [id, navigate]);
 
   useEffect(() => {
-    if (id) {
-      fetchPoll();
-      
-      // Join the poll room for real-time updates
-      joinPollRoom(id);
+    if (!id) return;
 
-      // Listen for poll updates
-      const handleUpdate = (updatedPoll: Poll) => {
-        console.log('Poll updated:', updatedPoll);
-        setPoll(updatedPoll);
-      };
-      
-      onPollUpdate(handleUpdate);
+    console.log('🔄 PollDetail useEffect running for poll:', id);
+    
+    // Fetch poll data
+    fetchPoll();
+    
+    // Join the poll room for real-time updates
+    joinPollRoom(id);
 
-      // Cleanup
-      return () => {
-        leavePollRoom(id);
-        offPollUpdate(handleUpdate);
-      };
-    }
-  }, [id, joinPollRoom, leavePollRoom, onPollUpdate, offPollUpdate, fetchPoll]);
+    // Listen for poll updates
+    const handleUpdate = (updatedPoll: Poll) => {
+      console.log('📨 Poll update received:', updatedPoll._id);
+      setPoll(updatedPoll);
+    };
+    
+    onPollUpdate(handleUpdate);
+
+    // Cleanup function - runs when component unmounts or id changes
+    return () => {
+      console.log('🧹 PollDetail cleanup for poll:', id);
+      leavePollRoom(id);
+      offPollUpdate(handleUpdate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // Only depend on id - socket functions are now stable with useCallback
 
   const handleVote = async () => {
     if (selectedOption === null || !poll) {
@@ -91,22 +129,41 @@ export function PollDetail() {
     setVoting(true);
 
     try {
-      const response = await fetch(`http://localhost:5000/api/polls/${id}/vote`, {
+      // Generate or retrieve voter ID for anonymous voting
+      let voterId = localStorage.getItem('voterId');
+      if (!voterId) {
+        // Generate a unique voter ID based on timestamp and random string
+        voterId = `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        localStorage.setItem('voterId', voterId);
+      }
+
+      // If user is authenticated, get their token (optional for voting)
+      const token = user ? await auth.currentUser?.getIdToken() : null;
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(getApiUrl(`api/polls/${id}/vote`), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           optionIndex: selectedOption,
+          voterId: voterId, // Send voterId for anonymous users
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to submit vote');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to submit vote');
       }
 
-      const updatedPoll = await response.json();
-      setPoll(updatedPoll);
+      const data = await response.json();
+      setPoll(data.poll || data);
       setHasVoted(true);
 
       // Store in localStorage
@@ -117,9 +174,46 @@ export function PollDetail() {
       toast.success('Vote submitted successfully!');
     } catch (error) {
       console.error('Error submitting vote:', error);
-      toast.error('Failed to submit vote. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to submit vote. Please try again.');
     } finally {
       setVoting(false);
+    }
+  };
+
+  const handleEdit = () => {
+    navigate(`/poll/${id}/edit`);
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      
+      if (!token) {
+        toast.error('You must be logged in to delete polls');
+        return;
+      }
+
+      const response = await fetch(getApiUrl(`api/polls/${id}`), {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete poll');
+      }
+
+      toast.success('Poll deleted successfully');
+      navigate('/');
+    } catch (error) {
+      console.error('Error deleting poll:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete poll');
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -131,6 +225,21 @@ export function PollDetail() {
   })) || [];
 
   const totalVotes = poll?.options.reduce((sum, option) => sum + option.votes, 0) || 0;
+  const isCreator = user && poll && poll.createdBy === user.uid;
+  
+  // Debug logging
+  console.log('PollDetail render:', {
+    pollId: id,
+    pollCreatedBy: poll?.createdBy,
+    currentUserId: user?.uid,
+    isCreator,
+    showShareDialog
+  });
+
+  // Track showShareDialog state changes
+  useEffect(() => {
+    console.log('showShareDialog state changed to:', showShareDialog);
+  }, [showShareDialog]);
 
   const COLORS = [
     '#6366f1', // indigo-500
@@ -189,6 +298,45 @@ export function PollDetail() {
                 <Badge variant="secondary" className="bg-green-100 text-green-700">
                   Live
                 </Badge>
+              )}
+              {isCreator && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('Share button clicked in PollDetail, isCreator:', isCreator);
+                      console.log('Current showShareDialog state:', showShareDialog);
+                      console.log('Poll data exists:', !!poll);
+                      setShowShareDialog(true);
+                      console.log('After setState - showShareDialog should be true');
+                    }}
+                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+                    type="button"
+                  >
+                    <Share2 className="size-4 mr-2" />
+                    Share
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEdit}
+                  >
+                    <Edit2 className="size-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="size-4 mr-2" />
+                    Delete
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -333,6 +481,46 @@ export function PollDetail() {
           </Card>
         </div>
       </div>
+
+      {poll && (
+        <ShareDialog
+          pollId={id!}
+          pollTitle={poll.title}
+          open={showShareDialog}
+          onOpenChange={(open) => {
+            console.log('ShareDialog onOpenChange called with:', open);
+            setShowShareDialog(open);
+          }}
+        />
+      )}
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Poll</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this poll? This action cannot be undone and all votes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
