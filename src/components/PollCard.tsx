@@ -16,7 +16,6 @@ import {
 import { Users, Calendar, Edit2, Trash2, Loader2, Share2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
-import { ShareDialog } from './ShareDialog';
 import { toast } from 'sonner@2.0.3';
 import { getApiUrl } from '../config/api';
 
@@ -39,7 +38,6 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showShareDialog, setShowShareDialog] = useState(false);
 
   const totalVotes = poll.options.reduce((sum, option) => sum + option.votes, 0);
   const formattedDate = new Date(poll.createdAt).toLocaleDateString('en-US', {
@@ -49,19 +47,10 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
   });
 
   const isCreator = user && poll.createdBy === user.uid;
-  
-  // Debug logging
-  console.log('PollCard render:', {
-    pollId: poll._id,
-    pollCreatedBy: poll.createdBy,
-    currentUserId: user?.uid,
-    isCreator
-  });
 
   const handleEdit = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Edit button clicked');
     navigate(`/poll/${poll._id}/edit`);
   };
 
@@ -103,26 +92,18 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Delete button clicked');
     setShowDeleteDialog(true);
   };
 
   const handleShareClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Share button clicked, isCreator:', isCreator);
-    setShowShareDialog(true);
+    // Navigate to poll detail page where share box is available
+    navigate(`/poll/${poll._id}?share=true`);
   };
 
   return (
     <>
-      <ShareDialog
-        pollId={poll._id}
-        pollTitle={poll.title}
-        open={showShareDialog}
-        onOpenChange={setShowShareDialog}
-      />
-
       <Link to={`/poll/${poll._id}`}>
         <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer border-border hover:border-indigo-400">
           <CardHeader>

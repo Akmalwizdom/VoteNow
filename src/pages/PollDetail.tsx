@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Label } from '../components/ui/label';
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,12 +17,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
-import { ArrowLeft, Users, CheckCircle2, Loader2, Edit2, Trash2, Share2 } from 'lucide-react';
+import { ArrowLeft, Users, CheckCircle2, Loader2, Edit2, Trash2, Share2, Copy, Check, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
-import { ShareDialog } from '../components/ShareDialog';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getApiUrl } from '../config/api';
 
@@ -44,6 +44,7 @@ interface Poll {
 export function PollDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { joinPollRoom, leavePollRoom, onPollUpdate, offPollUpdate, isConnected } = useSocket();
 
@@ -54,19 +55,86 @@ export function PollDetail() {
   const [hasVoted, setHasVoted] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [showShareDialog, setShowShareDialog] = useState(false);
+  
+  // Inline share box state
+  const [showShareBox, setShowShareBox] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
-  // Test function to verify state management
-  const testShareDialog = () => {
-    console.log('=== TEST SHARE DIALOG ===');
-    console.log('Current state:', showShareDialog);
-    console.log('Setting to true...');
-    setShowShareDialog(true);
-    // Use setTimeout to check after React has updated
-    setTimeout(() => {
-      console.log('State after update should be true');
-    }, 100);
+  const generateShareLink = useCallback(async () => {
+    if (!id) return;
+    
+    setShareLoading(true);
+    
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      
+      if (!token) {
+        toast.error('You must be logged in to generate share link');
+        setShareLoading(false);
+        return;
+      }
+
+      const response = await fetch(getApiUrl(`api/polls/${id}/share`), {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 503 && data.fallbackUrl) {
+          setShareLink(data.fallbackUrl);
+          toast.success('Fallback link generated (ngrok not running)');
+        } else {
+          throw new Error(data.error || 'Failed to generate share link');
+        }
+      } else if (data.shareLink) {
+        setShareLink(data.shareLink);
+        toast.success('Share link generated!');
+      }
+    } catch (error) {
+      console.error('Error generating share link:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to generate share link');
+    } finally {
+      setShareLoading(false);
+    }
+  }, [id]);
+
+  const handleShareClick = () => {
+    if (showShareBox) {
+      setShowShareBox(false);
+      setShareLink('');
+      setShareCopied(false);
+    } else {
+      setShowShareBox(true);
+      generateShareLink();
+    }
   };
+
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setShareCopied(true);
+      toast.success('Link copied to clipboard!');
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (error) {
+      toast.error('Failed to copy link');
+    }
+  };
+
+  // Auto-open share box if navigated with ?share=true
+  useEffect(() => {
+    if (searchParams.get('share') === 'true' && !showShareBox && !loading) {
+      setShowShareBox(true);
+      generateShareLink();
+      // Remove the query param from URL
+      setSearchParams({});
+    }
+  }, [searchParams, showShareBox, loading, generateShareLink, setSearchParams]);
 
   // Fetch poll data
   const fetchPoll = useCallback(async () => {
@@ -94,8 +162,6 @@ export function PollDetail() {
 
   useEffect(() => {
     if (!id) return;
-
-    console.log('🔄 PollDetail useEffect running for poll:', id);
     
     // Fetch poll data
     fetchPoll();
@@ -105,7 +171,6 @@ export function PollDetail() {
 
     // Listen for poll updates
     const handleUpdate = (updatedPoll: Poll) => {
-      console.log('📨 Poll update received:', updatedPoll._id);
       setPoll(updatedPoll);
     };
     
@@ -113,7 +178,6 @@ export function PollDetail() {
 
     // Cleanup function - runs when component unmounts or id changes
     return () => {
-      console.log('🧹 PollDetail cleanup for poll:', id);
       leavePollRoom(id);
       offPollUpdate(handleUpdate);
     };
@@ -226,20 +290,6 @@ export function PollDetail() {
 
   const totalVotes = poll?.options.reduce((sum, option) => sum + option.votes, 0) || 0;
   const isCreator = user && poll && poll.createdBy === user.uid;
-  
-  // Debug logging
-  console.log('PollDetail render:', {
-    pollId: id,
-    pollCreatedBy: poll?.createdBy,
-    currentUserId: user?.uid,
-    isCreator,
-    showShareDialog
-  });
-
-  // Track showShareDialog state changes
-  useEffect(() => {
-    console.log('showShareDialog state changed to:', showShareDialog);
-  }, [showShareDialog]);
 
   const COLORS = [
     '#6366f1', // indigo-500
@@ -304,20 +354,21 @@ export function PollDetail() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('Share button clicked in PollDetail, isCreator:', isCreator);
-                      console.log('Current showShareDialog state:', showShareDialog);
-                      console.log('Poll data exists:', !!poll);
-                      setShowShareDialog(true);
-                      console.log('After setState - showShareDialog should be true');
-                    }}
-                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+                    onClick={handleShareClick}
+                    className={showShareBox ? "bg-indigo-100 text-indigo-700 border-indigo-300" : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"}
                     type="button"
                   >
-                    <Share2 className="size-4 mr-2" />
-                    Share
+                    {showShareBox ? (
+                      <>
+                        <X className="size-4 mr-2" />
+                        Close
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="size-4 mr-2" />
+                        Share
+                      </>
+                    )}
                   </Button>
                   <Button
                     variant="outline"
@@ -344,6 +395,57 @@ export function PollDetail() {
             <p className="text-muted-foreground">{poll.description}</p>
           )}
         </div>
+
+        {/* Inline Share Box */}
+        {showShareBox && (
+          <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Share2 className="size-5 text-indigo-600" />
+              <span className="font-medium text-indigo-900">Share this poll</span>
+            </div>
+            
+            {shareLoading ? (
+              <div className="flex items-center gap-2 py-2">
+                <Loader2 className="size-4 animate-spin text-indigo-600" />
+                <span className="text-sm text-indigo-700">Generating share link...</span>
+              </div>
+            ) : shareLink ? (
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    value={shareLink}
+                    readOnly
+                    className="flex-1 font-mono text-sm bg-white"
+                    onClick={(e) => e.currentTarget.select()}
+                  />
+                  <Button
+                    onClick={copyShareLink}
+                    className={shareCopied ? "bg-green-600 hover:bg-green-700" : "bg-indigo-600 hover:bg-indigo-700"}
+                  >
+                    {shareCopied ? (
+                      <>
+                        <Check className="size-4 mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-4 mr-2" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-indigo-600">
+                  Anyone with this link can view and vote on your poll
+                </p>
+              </div>
+            ) : (
+              <div className="text-sm text-red-600">
+                Failed to generate link. Please try again.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Two Column Layout */}
         <div className="grid lg:grid-cols-2 gap-6">
@@ -481,18 +583,6 @@ export function PollDetail() {
           </Card>
         </div>
       </div>
-
-      {poll && (
-        <ShareDialog
-          pollId={id!}
-          pollTitle={poll.title}
-          open={showShareDialog}
-          onOpenChange={(open) => {
-            console.log('ShareDialog onOpenChange called with:', open);
-            setShowShareDialog(open);
-          }}
-        />
-      )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
