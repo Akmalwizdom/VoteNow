@@ -5,11 +5,12 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { X, Plus, Loader2 } from 'lucide-react';
+import { X, Plus, Loader2, Clock } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 import { getApiUrl } from '../config/api';
+import { toLocalDateTimeString } from '../utils/pollStatus';
 
 export function CreatePoll() {
   const { user } = useAuth();
@@ -19,6 +20,9 @@ export function CreatePoll() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [options, setOptions] = useState(['', '']);
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [useScheduling, setUseScheduling] = useState(false);
 
   const addOption = () => {
     if (options.length < 10) {
@@ -57,6 +61,18 @@ export function CreatePoll() {
       return;
     }
 
+    // Validate scheduling
+    if (useScheduling) {
+      if (startTime && endTime) {
+        const start = new Date(startTime);
+        const end = new Date(endTime);
+        if (start >= end) {
+          toast.error('End time must be after start time');
+          return;
+        }
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -68,8 +84,6 @@ export function CreatePoll() {
         return;
       }
       
-      console.log('Creating poll with token:', token.substring(0, 20) + '...');
-      
       const response = await fetch(getApiUrl('api/polls'), {
         method: 'POST',
         headers: {
@@ -80,6 +94,8 @@ export function CreatePoll() {
           title: title.trim(),
           description: description.trim(),
           options: validOptions.map(text => ({ text })),
+          startTime: useScheduling && startTime ? new Date(startTime).toISOString() : null,
+          endTime: useScheduling && endTime ? new Date(endTime).toISOString() : null,
         }),
       });
 
@@ -180,6 +196,48 @@ export function CreatePoll() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Scheduling */}
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="useScheduling"
+                  checked={useScheduling}
+                  onChange={(e) => setUseScheduling(e.target.checked)}
+                  className="size-4 rounded border-gray-300"
+                />
+                <Label htmlFor="useScheduling" className="flex items-center gap-2 cursor-pointer">
+                  <Clock className="size-4" />
+                  Schedule poll timing
+                </Label>
+              </div>
+
+              {useScheduling && (
+                <div className="grid grid-cols-2 gap-4 pl-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="startTime">Start Time</Label>
+                    <Input
+                      id="startTime"
+                      type="datetime-local"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Leave empty to start immediately</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endTime">End Time</Label>
+                    <Input
+                      id="endTime"
+                      type="datetime-local"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Leave empty for no deadline</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}

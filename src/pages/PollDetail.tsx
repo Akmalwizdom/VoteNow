@@ -17,13 +17,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
-import { ArrowLeft, Users, CheckCircle2, Loader2, Edit2, Trash2, Share2, Copy, Check, X } from 'lucide-react';
+import { ArrowLeft, Users, CheckCircle2, Loader2, Edit2, Trash2, Share2, Copy, Check, X, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getApiUrl } from '../config/api';
+import { getPollStatus, formatDateTime, PollStatusInfo } from '../utils/pollStatus';
 
 interface PollOption {
   text: string;
@@ -39,6 +40,8 @@ interface Poll {
   createdBy?: string;
   createdByEmail?: string;
   createdByName?: string;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 export function PollDetail() {
@@ -61,6 +64,23 @@ export function PollDetail() {
   const [shareLink, setShareLink] = useState('');
   const [shareLoading, setShareLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+
+  // Poll status
+  const [pollStatus, setPollStatus] = useState<PollStatusInfo | null>(null);
+
+  // Update poll status every second for countdown
+  useEffect(() => {
+    if (!poll) return;
+    
+    const updateStatus = () => {
+      setPollStatus(getPollStatus(poll.startTime, poll.endTime));
+    };
+    
+    updateStatus();
+    const interval = setInterval(updateStatus, 1000);
+    
+    return () => clearInterval(interval);
+  }, [poll]);
 
   const generateShareLink = useCallback(async () => {
     if (!id) return;
@@ -187,6 +207,16 @@ export function PollDetail() {
   const handleVote = async () => {
     if (selectedOption === null || !poll) {
       toast.error('Please select an option');
+      return;
+    }
+
+    // Check if voting is allowed
+    if (pollStatus && !pollStatus.canVote) {
+      if (pollStatus.status === 'not_started') {
+        toast.error('This poll has not started yet');
+      } else if (pollStatus.status === 'ended') {
+        toast.error('This poll has ended');
+      }
       return;
     }
 
@@ -349,6 +379,20 @@ export function PollDetail() {
                   Live
                 </Badge>
               )}
+              {pollStatus && (
+                <Badge 
+                  variant="secondary" 
+                  className={
+                    pollStatus.status === 'active' ? 'bg-green-100 text-green-700' :
+                    pollStatus.status === 'not_started' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }
+                >
+                  <Clock className="size-3 mr-1" />
+                  {pollStatus.label}
+                  {pollStatus.timeRemaining && ` (${pollStatus.timeRemaining})`}
+                </Badge>
+              )}
               {isCreator && (
                 <>
                   <Button
@@ -393,6 +437,24 @@ export function PollDetail() {
           </div>
           {poll.description && (
             <p className="text-muted-foreground">{poll.description}</p>
+          )}
+
+          {/* Timing Info */}
+          {(poll.startTime || poll.endTime) && (
+            <div className="flex flex-wrap gap-4 mt-3 text-sm text-muted-foreground">
+              {poll.startTime && (
+                <div className="flex items-center gap-1">
+                  <Clock className="size-4" />
+                  <span>Starts: {formatDateTime(poll.startTime)}</span>
+                </div>
+              )}
+              {poll.endTime && (
+                <div className="flex items-center gap-1">
+                  <Clock className="size-4" />
+                  <span>Ends: {formatDateTime(poll.endTime)}</span>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -454,10 +516,42 @@ export function PollDetail() {
             <CardHeader>
               <CardTitle>Cast Your Vote</CardTitle>
               <CardDescription>
-                {hasVoted ? 'You have already voted in this poll' : 'Select one option below'}
+                {hasVoted 
+                  ? 'You have already voted in this poll' 
+                  : pollStatus?.status === 'not_started'
+                  ? 'Voting has not started yet'
+                  : pollStatus?.status === 'ended'
+                  ? 'Voting has ended'
+                  : 'Select one option below'}
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Poll not started message */}
+              {pollStatus?.status === 'not_started' && !hasVoted && (
+                <div className="flex items-center gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
+                  <AlertCircle className="size-5 text-yellow-600" />
+                  <div>
+                    <span className="text-yellow-700 font-medium">This poll has not started yet</span>
+                    {poll.startTime && (
+                      <p className="text-sm text-yellow-600">Starts: {formatDateTime(poll.startTime)}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Poll ended message */}
+              {pollStatus?.status === 'ended' && !hasVoted && (
+                <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
+                  <AlertCircle className="size-5 text-red-600" />
+                  <div>
+                    <span className="text-red-700 font-medium">This poll has ended</span>
+                    {poll.endTime && (
+                      <p className="text-sm text-red-600">Ended: {formatDateTime(poll.endTime)}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {hasVoted ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -515,14 +609,18 @@ export function PollDetail() {
 
                   <Button
                     onClick={handleVote}
-                    disabled={selectedOption === null || voting}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                    disabled={selectedOption === null || voting || !pollStatus?.canVote}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
                   >
                     {voting ? (
                       <>
                         <Loader2 className="size-4 mr-2 animate-spin" />
                         Submitting...
                       </>
+                    ) : pollStatus?.status === 'not_started' ? (
+                      'Voting Not Started'
+                    ) : pollStatus?.status === 'ended' ? (
+                      'Voting Ended'
                     ) : (
                       'Submit Vote'
                     )}

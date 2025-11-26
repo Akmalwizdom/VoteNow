@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -13,11 +13,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
-import { Users, Calendar, Edit2, Trash2, Loader2, Share2 } from 'lucide-react';
+import { Users, Calendar, Edit2, Trash2, Loader2, Share2, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 import { toast } from 'sonner@2.0.3';
 import { getApiUrl } from '../config/api';
+import { getPollStatus, PollStatusInfo } from '../utils/pollStatus';
 
 interface PollCardProps {
   poll: {
@@ -29,6 +30,8 @@ interface PollCardProps {
     createdBy?: string;
     createdByEmail?: string;
     createdByName?: string;
+    startTime?: string | null;
+    endTime?: string | null;
   };
   onDelete?: () => void;
 }
@@ -47,6 +50,21 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
   });
 
   const isCreator = user && poll.createdBy === user.uid;
+
+  // Poll status
+  const [pollStatus, setPollStatus] = useState<PollStatusInfo | null>(null);
+
+  useEffect(() => {
+    const updateStatus = () => {
+      setPollStatus(getPollStatus(poll.startTime, poll.endTime));
+    };
+    
+    updateStatus();
+    // Update every minute for cards (not as frequently as detail page)
+    const interval = setInterval(updateStatus, 60000);
+    
+    return () => clearInterval(interval);
+  }, [poll.startTime, poll.endTime]);
 
   const handleEdit = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -116,9 +134,24 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
                   </CardDescription>
                 )}
               </div>
-              <Badge variant="secondary" className="ml-2">
-                {poll.options.length} options
-              </Badge>
+              <div className="flex flex-col gap-1 items-end">
+                <Badge variant="secondary">
+                  {poll.options.length} options
+                </Badge>
+                {pollStatus && (poll.startTime || poll.endTime) && (
+                  <Badge 
+                    variant="secondary" 
+                    className={
+                      pollStatus.status === 'active' ? 'bg-green-100 text-green-700' :
+                      pollStatus.status === 'not_started' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }
+                  >
+                    <Clock className="size-3 mr-1" />
+                    {pollStatus.label}
+                  </Badge>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent>

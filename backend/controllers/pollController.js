@@ -15,12 +15,35 @@ const findPoll = async (id) => {
 
 export const createPoll = async (req, res) => {
   try {
-    const { title, description, options } = req.body;
+    const { title, description, options, startTime, endTime } = req.body;
     const user = req.user;
 
     // Validation
     if (!title || !options || !Array.isArray(options) || options.length < 2) {
       return res.status(400).json({ error: 'Title and at least 2 valid options are required' });
+    }
+
+    // Validate times
+    let parsedStartTime = null;
+    let parsedEndTime = null;
+
+    if (startTime) {
+      parsedStartTime = new Date(startTime);
+      if (isNaN(parsedStartTime.getTime())) {
+        return res.status(400).json({ error: 'Invalid start time format' });
+      }
+    }
+
+    if (endTime) {
+      parsedEndTime = new Date(endTime);
+      if (isNaN(parsedEndTime.getTime())) {
+        return res.status(400).json({ error: 'Invalid end time format' });
+      }
+    }
+
+    // Validate time logic
+    if (parsedStartTime && parsedEndTime && parsedStartTime >= parsedEndTime) {
+      return res.status(400).json({ error: 'End time must be after start time' });
     }
 
     // Sanitize input
@@ -48,6 +71,8 @@ export const createPoll = async (req, res) => {
       title: cleanTitle,
       description: cleanDescription,
       options: mappedOptions,
+      startTime: parsedStartTime,
+      endTime: parsedEndTime,
       createdBy: user.uid,
       createdByEmail: user.email,
       createdByName: user.displayName,
@@ -129,6 +154,25 @@ export const voteOnPoll = async (req, res) => {
       return res.status(404).json({ error: 'Poll not found' });
     }
 
+    // Check poll timing
+    const now = new Date();
+    
+    if (poll.startTime && now < new Date(poll.startTime)) {
+      return res.status(403).json({ 
+        error: 'This poll has not started yet',
+        status: 'not_started',
+        startTime: poll.startTime
+      });
+    }
+
+    if (poll.endTime && now > new Date(poll.endTime)) {
+      return res.status(403).json({ 
+        error: 'This poll has ended',
+        status: 'ended',
+        endTime: poll.endTime
+      });
+    }
+
     if (optionIndex >= poll.options.length) {
       return res.status(400).json({ error: 'Invalid option index' });
     }
@@ -159,7 +203,7 @@ export const voteOnPoll = async (req, res) => {
 export const updatePoll = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, options } = req.body;
+    const { title, description, options, startTime, endTime } = req.body;
     const user = req.user;
 
     const poll = await findPoll(id);
@@ -176,6 +220,22 @@ export const updatePoll = async (req, res) => {
     // Validation
     if (!title || !options || !Array.isArray(options) || options.length < 2) {
       return res.status(400).json({ error: 'Title and at least 2 valid options are required' });
+    }
+
+    // Validate times
+    let parsedStartTime = startTime === null ? null : (startTime ? new Date(startTime) : poll.startTime);
+    let parsedEndTime = endTime === null ? null : (endTime ? new Date(endTime) : poll.endTime);
+
+    if (parsedStartTime && isNaN(parsedStartTime.getTime())) {
+      return res.status(400).json({ error: 'Invalid start time format' });
+    }
+
+    if (parsedEndTime && isNaN(parsedEndTime.getTime())) {
+      return res.status(400).json({ error: 'Invalid end time format' });
+    }
+
+    if (parsedStartTime && parsedEndTime && parsedStartTime >= parsedEndTime) {
+      return res.status(400).json({ error: 'End time must be after start time' });
     }
 
     // Sanitize input
@@ -204,6 +264,8 @@ export const updatePoll = async (req, res) => {
     poll.title = cleanTitle;
     poll.description = cleanDescription;
     poll.options = mappedOptions;
+    poll.startTime = parsedStartTime;
+    poll.endTime = parsedEndTime;
     poll.updatedAt = new Date();
 
     await poll.save();

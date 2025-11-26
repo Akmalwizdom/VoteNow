@@ -5,11 +5,12 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Label } from '../components/ui/label';
-import { X, Plus, Loader2 } from 'lucide-react';
+import { X, Plus, Loader2, Clock } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 import { getApiUrl } from '../config/api';
+import { toLocalDateTimeString } from '../utils/pollStatus';
 
 export function EditPoll() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,9 @@ export function EditPoll() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [options, setOptions] = useState<Array<{ text: string; votes: number }>>([]);
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [useScheduling, setUseScheduling] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -49,6 +53,13 @@ export function EditPoll() {
       setTitle(poll.title);
       setDescription(poll.description || '');
       setOptions(poll.options);
+      
+      // Load scheduling data
+      if (poll.startTime || poll.endTime) {
+        setUseScheduling(true);
+        if (poll.startTime) setStartTime(toLocalDateTimeString(new Date(poll.startTime)));
+        if (poll.endTime) setEndTime(toLocalDateTimeString(new Date(poll.endTime)));
+      }
     } catch (error) {
       console.error('Error fetching poll:', error);
       toast.error('Failed to load poll');
@@ -95,6 +106,16 @@ export function EditPoll() {
       return;
     }
 
+    // Validate scheduling
+    if (useScheduling && startTime && endTime) {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      if (start >= end) {
+        toast.error('End time must be after start time');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -116,6 +137,8 @@ export function EditPoll() {
           title: title.trim(),
           description: description.trim(),
           options: validOptions.map(opt => ({ text: opt.text, votes: opt.votes })),
+          startTime: useScheduling && startTime ? new Date(startTime).toISOString() : null,
+          endTime: useScheduling && endTime ? new Date(endTime).toISOString() : null,
         }),
       });
 
@@ -232,6 +255,48 @@ export function EditPoll() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Scheduling */}
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="useScheduling"
+                  checked={useScheduling}
+                  onChange={(e) => setUseScheduling(e.target.checked)}
+                  className="size-4 rounded border-gray-300"
+                />
+                <Label htmlFor="useScheduling" className="flex items-center gap-2 cursor-pointer">
+                  <Clock className="size-4" />
+                  Schedule poll timing
+                </Label>
+              </div>
+
+              {useScheduling && (
+                <div className="grid grid-cols-2 gap-4 pl-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="startTime">Start Time</Label>
+                    <Input
+                      id="startTime"
+                      type="datetime-local"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Leave empty to start immediately</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endTime">End Time</Label>
+                    <Input
+                      id="endTime"
+                      type="datetime-local"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Leave empty for no deadline</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}

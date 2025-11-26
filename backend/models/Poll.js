@@ -46,6 +46,17 @@ const pollSchema = new mongoose.Schema({
     default: ''
   },
 
+  // Poll scheduling
+  startTime: {
+    type: Date,
+    default: null
+  },
+
+  endTime: {
+    type: Date,
+    default: null
+  },
+
   createdAt: {
     type: Date,
     default: Date.now,
