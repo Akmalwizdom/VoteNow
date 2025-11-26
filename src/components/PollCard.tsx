@@ -123,7 +123,7 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
   return (
     <>
       <Link to={`/poll/${poll._id}`}>
-        <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer border-border hover:border-indigo-400">
+        <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-200 ease-in-out cursor-pointer border-border hover:border-indigo-400 active:scale-[0.99]">
           <CardHeader>
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -179,7 +179,7 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-8 hover:bg-indigo-100 hover:text-indigo-700"
+                    className="size-8 hover:bg-indigo-100 hover:text-indigo-700 transition-all duration-200 ease-in-out"
                     onClick={handleShareClick}
                     title="Share poll"
                     type="button"
@@ -189,7 +189,7 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-8"
+                    className="size-8 hover:bg-accent transition-all duration-200 ease-in-out"
                     onClick={handleEdit}
                     title="Edit poll"
                     type="button"
@@ -199,7 +199,7 @@ export function PollCard({ poll, onDelete }: PollCardProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-8 hover:bg-destructive/10 hover:text-destructive"
+                    className="size-8 hover:bg-destructive/10 hover:text-destructive transition-all duration-200 ease-in-out"
                     onClick={handleDeleteClick}
                     title="Delete poll"
                     type="button"

@@ -19,10 +19,10 @@ export function Navbar() {
   };
 
   return (
-    <nav className="border-b bg-card sticky top-0 z-50">
+    <nav className="border-b bg-card sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 hover:-translate-y-0.5 transition-all duration-200 ease-in-out active:scale-95">
             <Vote className="size-6 text-indigo-600" />
             <span className="text-xl">VoteNow</span>
           </Link>
@@ -30,7 +30,7 @@ export function Navbar() {
           <div className="flex items-center gap-3">
             {user ? (
               <>
-                <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg">
+                <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg hover:shadow-md transition-all duration-200 ease-in-out">
                   <User className="size-4" />
                   <span className="text-sm">{user.displayName || user.email}</span>
                 </div>

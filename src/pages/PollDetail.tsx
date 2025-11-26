@@ -359,7 +359,7 @@ export function PollDetail() {
         <Button
           variant="ghost"
           onClick={() => navigate('/')}
-          className="mb-6"
+          className="mb-6 hover:-translate-x-1 transition-all duration-200 ease-in-out"
         >
           <ArrowLeft className="size-4 mr-2" />
           Back to Polls
@@ -460,7 +460,7 @@ export function PollDetail() {
 
         {/* Inline Share Box */}
         {showShareBox && (
-          <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg shadow-sm transition-all duration-200 ease-in-out">
             <div className="flex items-center gap-2 mb-3">
               <Share2 className="size-5 text-indigo-600" />
               <span className="font-medium text-indigo-900">Share this poll</span>
@@ -564,16 +564,16 @@ export function PollDetail() {
                     {poll.options.map((option, index) => {
                       const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
                       return (
-                        <div key={index} className="space-y-1">
+                        <div key={index} className="space-y-1 group">
                           <div className="flex items-center justify-between text-sm">
-                            <span>{option.text}</span>
+                            <span className="group-hover:text-indigo-700 transition-colors duration-200">{option.text}</span>
                             <span className="text-muted-foreground">
                               {option.votes} ({percentage.toFixed(1)}%)
                             </span>
                           </div>
                           <div className="h-2 bg-secondary rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-indigo-600 transition-all duration-500"
+                              className="h-full bg-indigo-600 transition-all duration-500 ease-in-out"
                               style={{ width: `${percentage}%` }}
                             />
                           </div>
@@ -592,7 +592,7 @@ export function PollDetail() {
                       {poll.options.map((option, index) => (
                         <div
                           key={index}
-                          className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+                          className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-accent hover:shadow-md cursor-pointer transition-all duration-200 ease-in-out active:scale-[0.99]"
                           onClick={() => setSelectedOption(index)}
                         >
                           <RadioGroupItem value={index.toString()} id={`option-${index}`} />

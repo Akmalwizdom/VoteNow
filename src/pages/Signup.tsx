@@ -120,7 +120,7 @@ export function Signup() {
 
             <div className="mt-4 text-center text-sm">
               <span className="text-muted-foreground">Already have an account? </span>
-              <Link to="/login" className="text-indigo-600 hover:underline">
+              <Link to="/login" className="text-indigo-600 hover:underline transition-all duration-200 ease-in-out hover:text-indigo-700">
                 Login
               </Link>
             </div>

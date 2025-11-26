@@ -116,8 +116,8 @@ export function Home() {
 
         {/* Features */}
         <div className="grid md:grid-cols-3 gap-6 mb-16">
-          <div className="text-center p-6 bg-card rounded-xl border">
-            <div className="inline-flex p-3 bg-indigo-100 rounded-lg mb-4">
+          <div className="text-center p-6 bg-card rounded-xl border hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-in-out active:scale-[0.99] cursor-default">
+            <div className="inline-flex p-3 bg-indigo-100 rounded-lg mb-4 transition-all duration-200 ease-in-out">
               <TrendingUp className="size-6 text-indigo-600" />
             </div>
             <h3 className="mb-2">Real-Time Updates</h3>
@@ -125,8 +125,8 @@ export function Home() {
               Watch results update instantly as votes come in with WebSocket technology
             </p>
           </div>
-          <div className="text-center p-6 bg-card rounded-xl border">
-            <div className="inline-flex p-3 bg-violet-100 rounded-lg mb-4">
+          <div className="text-center p-6 bg-card rounded-xl border hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-in-out active:scale-[0.99] cursor-default">
+            <div className="inline-flex p-3 bg-violet-100 rounded-lg mb-4 transition-all duration-200 ease-in-out">
               <Users className="size-6 text-violet-600" />
             </div>
             <h3 className="mb-2">Easy to Share</h3>
@@ -134,8 +134,8 @@ export function Home() {
               Share polls with anyone via a simple link. No sign-up required to vote
             </p>
           </div>
-          <div className="text-center p-6 bg-card rounded-xl border">
-            <div className="inline-flex p-3 bg-pink-100 rounded-lg mb-4">
+          <div className="text-center p-6 bg-card rounded-xl border hover:shadow-xl hover:-translate-y-1 transition-all duration-200 ease-in-out active:scale-[0.99] cursor-default">
+            <div className="inline-flex p-3 bg-pink-100 rounded-lg mb-4 transition-all duration-200 ease-in-out">
               <Vote className="size-6 text-pink-600" />
             </div>
             <h3 className="mb-2">Beautiful Analytics</h3>
@@ -173,7 +173,7 @@ export function Home() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-16 bg-card rounded-xl border">
+            <div className="text-center py-16 bg-card rounded-xl border hover:shadow-md transition-all duration-200 ease-in-out">
               <Vote className="size-16 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="mb-2">No polls yet</h3>
               <p className="text-muted-foreground mb-6">

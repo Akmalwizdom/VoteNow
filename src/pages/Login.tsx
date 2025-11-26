@@ -94,7 +94,7 @@ export function Login() {
 
             <div className="mt-4 text-center text-sm">
               <span className="text-muted-foreground">Don't have an account? </span>
-              <Link to="/signup" className="text-indigo-600 hover:underline">
+              <Link to="/signup" className="text-indigo-600 hover:underline transition-all duration-200 ease-in-out hover:text-indigo-700">
                 Sign up
               </Link>
             </div>

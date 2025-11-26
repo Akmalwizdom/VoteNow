@@ -225,7 +225,7 @@ export function EditPoll() {
               
               <div className="space-y-2">
                 {options.map((option, index) => (
-                  <div key={index} className="flex gap-2 items-center">
+                  <div key={index} className="flex gap-2 items-center transition-all duration-200 ease-in-out">
                     <div className="flex-1 flex gap-2">
                       <Input
                         placeholder={`Option ${index + 1}`}
@@ -247,7 +247,7 @@ export function EditPoll() {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeOption(index)}
-                        className="hover:bg-destructive/10 hover:text-destructive"
+                        className="hover:bg-destructive/10 hover:text-destructive transition-all duration-200 ease-in-out"
                       >
                         <X className="size-4" />
                       </Button>
@@ -265,9 +265,9 @@ export function EditPoll() {
                   id="useScheduling"
                   checked={useScheduling}
                   onChange={(e) => setUseScheduling(e.target.checked)}
-                  className="size-4 rounded border-gray-300"
+                  className="size-4 rounded border-gray-300 transition-all duration-200 ease-in-out"
                 />
-                <Label htmlFor="useScheduling" className="flex items-center gap-2 cursor-pointer">
+                <Label htmlFor="useScheduling" className="flex items-center gap-2 cursor-pointer hover:text-indigo-700 transition-all duration-200 ease-in-out">
                   <Clock className="size-4" />
                   Schedule poll timing
                 </Label>
