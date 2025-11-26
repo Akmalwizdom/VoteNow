@@ -159,17 +159,38 @@ export function PollDetail() {
   // Fetch poll data
   const fetchPoll = useCallback(async () => {
     try {
-      const response = await fetch(getApiUrl(`api/polls/${id}`));
+      // Get or generate voterId for anonymous users
+      let voterId = localStorage.getItem('voterId');
+      if (!voterId) {
+        voterId = `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        localStorage.setItem('voterId', voterId);
+      }
+
+      // Build URL with voterId query param for server-side hasVoted check
+      const apiPath = getApiUrl(`api/polls/${id}`);
+      const separator = apiPath.includes('?') ? '&' : '?';
+      const urlWithVoterId = `${apiPath}${separator}voterId=${encodeURIComponent(voterId)}`;
+
+      const response = await fetch(urlWithVoterId);
       if (!response.ok) {
         throw new Error('Poll not found');
       }
       const data = await response.json();
       setPoll(data);
       
-      // Check if user has already voted (from localStorage)
-      const votedPolls = JSON.parse(localStorage.getItem('votedPolls') || '{}');
-      if (votedPolls[id]) {
+      // Use server's hasVoted status (authoritative source)
+      // This checks if the current voterId or user.uid is in the poll's votedBy array
+      if (data.hasVoted) {
         setHasVoted(true);
+        // Also sync to localStorage for consistency
+        const votedPolls = JSON.parse(localStorage.getItem('votedPolls') || '{}');
+        if (id && !Object.prototype.hasOwnProperty.call(votedPolls, id)) {
+          votedPolls[id] = true;
+          localStorage.setItem('votedPolls', JSON.stringify(votedPolls));
+        }
+      } else {
+        // Server says user hasn't voted - trust the server
+        setHasVoted(false);
       }
     } catch (error) {
       console.error('Error fetching poll:', error);
@@ -260,9 +281,9 @@ export function PollDetail() {
       setPoll(data.poll || data);
       setHasVoted(true);
 
-      // Store in localStorage
+      // Store in localStorage (store true to indicate voted, not the option index)
       const votedPolls = JSON.parse(localStorage.getItem('votedPolls') || '{}');
-      votedPolls[id!] = selectedOption;
+      votedPolls[id!] = true;
       localStorage.setItem('votedPolls', JSON.stringify(votedPolls));
 
       toast.success('Vote submitted successfully!');

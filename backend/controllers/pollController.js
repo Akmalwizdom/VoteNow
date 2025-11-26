@@ -123,7 +123,33 @@ export const getPollById = async (req, res) => {
       return res.status(404).json({ error: 'Poll not found' });
     }
 
-    res.status(200).json(poll);
+    // Check if current user has voted
+    // Get voterId from query param (for anonymous users) or from auth (for authenticated users)
+    const voterId = req.query.voterId;
+    const userId = req.user ? req.user.uid : voterId;
+    
+    // Determine if this specific user has voted
+    let hasVoted = false;
+    if (userId && poll.votedBy && poll.votedBy.includes(userId)) {
+      hasVoted = true;
+    }
+
+    // Return poll data with hasVoted status (exclude votedBy array for privacy)
+    const pollResponse = {
+      _id: poll._id,
+      title: poll.title,
+      description: poll.description,
+      options: poll.options,
+      createdAt: poll.createdAt,
+      createdBy: poll.createdBy,
+      createdByEmail: poll.createdByEmail,
+      createdByName: poll.createdByName,
+      startTime: poll.startTime,
+      endTime: poll.endTime,
+      hasVoted: hasVoted
+    };
+
+    res.status(200).json(pollResponse);
   } catch (error) {
     console.error('Error fetching poll:', error);
     res.status(500).json({ error: 'Failed to fetch poll' });
